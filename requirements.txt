@@ -1,0 +1,5 @@
+slack-bolt>=1.18.0
+slack-sdk>=3.27.0
+flask>=3.0.0
+flask-cors>=4.0.0
+python-dotenv>=1.0.0

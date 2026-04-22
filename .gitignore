@@ -1,3 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node (legacy)
 node_modules/
+package-lock.json
+
+# Credentials
 .env
 user-tokens.json
