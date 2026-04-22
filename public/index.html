@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lead & Supplier Inbox</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f4f6f9;
+      --surface:  #ffffff;
+      --border:   #e2e8f0;
+      --primary:  #4f46e5;
+      --text:     #1e293b;
+      --muted:    #64748b;
+      --lead-bg:  #eff6ff;
+      --lead-bd:  #3b82f6;
+      --supp-bg:  #f0fdf4;
+      --supp-bd:  #22c55e;
+      --unk-bg:   #fafafa;
+      --unk-bd:   #94a3b8;
+      --danger:   #ef4444;
+      --radius:   10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    header h1 span { color: var(--primary); }
+
+    .badge {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 99px;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      min-width: 22px;
+      text-align: center;
+    }
+    .auto-label {
+      font-size: .78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* ── Test panel ── */
+    .test-banner {
+      background: #fefce8;
+      border-bottom: 1px solid #fde68a;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .84rem;
+      color: #92400e;
+    }
+    .test-banner strong { font-weight: 700; }
+    .test-banner button {
+      margin-left: auto;
+      padding: 5px 14px;
+      background: #f59e0b;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .test-banner button:hover { background: #d97706; }
+
+    /* ── Test modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: 14px;
+      width: min(560px, 94vw);
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-header h2 { font-size: 1rem; font-weight: 700; flex: 1; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 2px 6px;
+    }
+    .modal-close:hover { color: var(--text); }
+
+    .modal-body { padding: 18px 20px; }
+
+    .presets {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .preset-btn {
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      font-size: .78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .preset-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    .modal-body label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 6px;
+    }
+    .modal-body textarea {
+      width: 100%;
+      height: 180px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .88rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      resize: vertical;
+      outline: none;
+      line-height: 1.6;
+    }
+    .modal-body textarea:focus { border-color: var(--primary); }
+
+    .modal-hint {
+      margin-top: 8px;
+      font-size: .76rem;
+      color: var(--muted);
+    }
+
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn-cancel {
+      padding: 8px 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      font-size: .85rem;
+      cursor: pointer;
+    }
+    .btn-send {
+      padding: 8px 20px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-send:hover { opacity: .85; }
+    .btn-send:disabled { opacity: .5; cursor: not-allowed; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: .85rem;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: .25s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; transform: none; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 16px 24px;
+      flex-wrap: wrap;
+    }
+    .toolbar input {
+      flex: 1;
+      min-width: 200px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .9rem;
+      outline: none;
+      background: var(--surface);
+    }
+    .toolbar input:focus { border-color: var(--primary); }
+
+    .filter-btns { display: flex; gap: 6px; }
+    .filter-btns button {
+      padding: 7px 16px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      background: var(--surface);
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .filter-btns button.active,
+    .filter-btns button:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .refresh-btn {
+      padding: 8px 16px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity .15s;
+    }
+    .refresh-btn:hover { opacity: .85; }
+    .refresh-btn svg { animation: none; }
+    .refresh-btn.spinning svg { animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      padding: 0 24px 32px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow .2s;
+    }
+    .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .type-pill {
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .type-lead     { background: var(--lead-bg); color: var(--lead-bd); border: 1px solid var(--lead-bd); }
+    .type-supplier { background: var(--supp-bg); color: #16a34a;        border: 1px solid var(--supp-bd); }
+    .type-unknown  { background: var(--unk-bg);  color: var(--muted);   border: 1px solid var(--unk-bd); }
+
+    .card-channel { font-size: .78rem; color: var(--muted); margin-left: auto; }
+    .card-time    { font-size: .75rem; color: var(--muted); }
+
+    .card-body { padding: 14px; flex: 1; }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 4px 8px;
+      align-items: start;
+      margin-bottom: 8px;
+      font-size: .86rem;
+    }
+    .field-key {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding-top: 1px;
+    }
+    .field-row--highlight .field-key { color: var(--primary); }
+    .field-row--highlight .field-val { font-weight: 600; }
+    .field-val { color: var(--text); word-break: break-word; }
+    .field-val a { color: var(--primary); text-decoration: none; }
+    .field-val a:hover { text-decoration: underline; }
+
+    .no-fields { color: var(--muted); font-size: .85rem; font-style: italic; }
+
+    .card-raw {
+      margin: 10px 0 0;
+      border-top: 1px dashed var(--border);
+      padding-top: 10px;
+    }
+    .card-raw summary {
+      font-size: .78rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-raw pre {
+      margin-top: 8px;
+      font-size: .78rem;
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .card-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn-dismiss {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface);
+      font-size: .82rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: .15s;
+    }
+    .btn-dismiss:hover { background: #fef2f2; color: var(--danger); border-color: var(--danger); }
+
+    /* ── Empty state ── */
+    .empty {
+      grid-column: 1/-1;
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--muted);
+    }
+    .empty svg { margin-bottom: 16px; opacity: .35; }
+    .empty p { font-size: .95rem; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>Lead & Supplier <span>Inbox</span></h1>
+  <span class="badge" id="total-badge">0</span>
+  <span class="auto-label"><span class="dot"></span> live</span>
+</header>
+
+<!-- Test mode banner -->
+<div class="test-banner">
+  <strong>Test Mode</strong> — Slack not connected yet. Use the simulator to test how messages parse.
+  <button onclick="openModal()">Simulate a message</button>
+</div>
+
+<!-- Simulate message modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Simulate a Slack message</h2>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="presets">
+        <span style="font-size:.78rem;color:var(--muted);align-self:center;">Presets:</span>
+        <button class="preset-btn" onclick="loadPreset('anuga')">Anuga format</button>
+        <button class="preset-btn" onclick="loadPreset('lead')">Lead</button>
+        <button class="preset-btn" onclick="loadPreset('supplier')">Supplier</button>
+        <button class="preset-btn" onclick="loadPreset('freeform')">Free-form</button>
+      </div>
+      <label>Paste the Slack message — contact details only</label>
+      <textarea id="mock-text" placeholder="Account: Company Name&#10;Contact: Full Name&#10;Title:   Job Title&#10;Phone:   +123456789&#10;Email:   name@company.com&#10;Source:  Event Name&#10;Type:    Lead / Supplier&#10;Notes:   Any extra info"></textarea>
+      <p class="modal-hint">
+        <strong>Required:</strong> Account, Contact, Email, Phone &nbsp;·&nbsp;
+        <strong>Optional:</strong> Title, Source, Type, Notes
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-send" id="send-btn" onclick="sendMock()">Send to dashboard</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <input type="text" id="search" placeholder="Search by name, email, company…" />
+  <div class="filter-btns">
+    <button class="active" data-filter="all">All</button>
+    <button data-filter="Lead">Leads</button>
+    <button data-filter="Supplier">Suppliers</button>
+  </div>
+  <button class="refresh-btn" id="refresh-btn" onclick="load()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </svg>
+    Refresh
+  </button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+  const API = '';
+  let activeFilter = 'all';
+  let searchVal    = '';
+
+  const grid       = document.getElementById('grid');
+  const badge      = document.getElementById('total-badge');
+  const refreshBtn = document.getElementById('refresh-btn');
+
+  const FRIENDLY = {
+    account:   'Account',
+    potential: 'Potential',
+    name:      'Contact Name',
+    title:     'Job Title',
+    email:     'Email',
+    phone:     'Phone',
+    source:    'Source',
+    website:   'Website',
+    address:   'Address',
+    type:      'Type',
+    notes:     'Notes',
+  };
+
+  // Field display order
+  const FIELD_ORDER = ['account', 'potential', 'name', 'title', 'email', 'phone', 'source', 'website', 'address', 'notes'];
+
+  const PRESETS = {
+    anuga: `Limbazu Formaggi
+Igors Aleksejevs Export Manager
++37126057829
+limbazu@limbazuformaggi.eu
+Source: Anuga`,
+
+    lead: `New Lead
+Name: Sarah Connor
+Company: Cyberdyne Systems
+Email: sarah.connor@cyberdyne.com
+Phone: +1 555-019-0100
+Notes: Interested in bulk order, follow up by Friday`,
+
+    supplier: `Supplier Inquiry
+Company: Green Farms Co.
+Contact Name: Ahmed Al-Rashid
+Email: ahmed@greenfarms.ae
+Phone: +971 50 123 4567
+Website: https://greenfarms.ae
+Type: Supplier
+Address: Dubai, UAE
+Notes: Organic produce, MOQ 500kg`,
+
+    freeform: `Hey team, got a new supplier contact from the trade fair today. Guy's name is Liu Wei from Shanghai Trade Ltd — reach him at liu.wei@shanghaitrade.cn or +86 21 6789 0123. They're based in Shanghai and seem legit, worth adding to the CRM.`,
+  };
+
+  // ── Modal ──
+  function openModal() {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('mock-text').focus();
+  }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+  function loadPreset(key) {
+    document.getElementById('mock-text').value = PRESETS[key];
+  }
+
+  // Close on backdrop click
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // ── Send mock message ──
+  async function sendMock() {
+    const text = document.getElementById('mock-text').value.trim();
+    if (!text) return;
+
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    clearValidationError();
+
+    try {
+      const res = await fetch(`${API}/api/entries/mock`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text }),
+      });
+
+      if (res.status === 422) {
+        const err = await res.json();
+        showValidationError(err.missing);
+        return;
+      }
+
+      closeModal();
+      await load();
+      showToast('Message parsed and added to the dashboard');
+    } catch {
+      showToast('Error — is the server running?');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send to dashboard';
+    }
+  }
+
+  function showValidationError(missing) {
+    let el = document.getElementById('validation-error');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'validation-error';
+      el.style.cssText = `
+        margin-top: 10px; padding: 10px 12px;
+        background: #fef2f2; border: 1px solid #fca5a5;
+        border-radius: 8px; font-size: .83rem; color: #b91c1c;
+      `;
+      document.getElementById('mock-text').after(el);
+    }
+    const labels = { account: 'Account', contact: 'Contact', 'email or phone': 'Email or Phone' };
+    const list = missing.map(f => `<strong>${labels[f] || f}</strong>`).join(', ');
+    el.innerHTML = `Missing required ${missing.length > 1 ? 'fields' : 'field'}: ${list}`;
+  }
+
+  function clearValidationError() {
+    document.getElementById('validation-error')?.remove();
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  // ── Rendering ──
+  function typePill(type) {
+    const t = (type || 'Unknown').toLowerCase();
+    const cls = t === 'lead' ? 'type-lead' : t === 'supplier' ? 'type-supplier' : 'type-unknown';
+    return `<span class="type-pill ${cls}">${type || 'Unknown'}</span>`;
+  }
+
+  function formatField(key, val) {
+    if (key === 'email')   return `<a href="mailto:${val}">${val}</a>`;
+    if (key === 'website') return `<a href="${val}" target="_blank" rel="noopener">${val}</a>`;
+    if (key === 'phone')   return `<a href="tel:${val}">${val}</a>`;
+    return val;
+  }
+
+  function relativeTime(iso) {
+    const diff = (Date.now() - new Date(iso)) / 1000;
+    if (diff < 60)    return 'just now';
+    if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+
+  function escHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderCard(entry) {
+    const { id, receivedAt, channel, fields, raw } = entry;
+    const allFields = { ...fields };
+    delete allFields.type;
+    const ordered = [
+      ...FIELD_ORDER.filter(k => k in allFields).map(k => [k, allFields[k]]),
+      ...Object.entries(allFields).filter(([k]) => !FIELD_ORDER.includes(k)),
+    ];
+    const displayFields = ordered;
+    const fieldsHtml = displayFields.length
+      ? displayFields.map(([k, v]) => `
+          <div class="field-row${k === 'account' || k === 'potential' ? ' field-row--highlight' : ''}">
+            <span class="field-key">${FRIENDLY[k] || k}</span>
+            <span class="field-val">${formatField(k, v)}</span>
+          </div>`).join('')
+      : '<p class="no-fields">No structured fields detected.</p>';
+
+    return `
+      <div class="card" id="card-${id}">
+        <div class="card-header">
+          ${typePill(fields.type)}
+          ${channel ? `<span class="card-channel">${channel}</span>` : ''}
+          <span class="card-time">${relativeTime(receivedAt)}</span>
+        </div>
+        <div class="card-body">
+          ${fieldsHtml}
+          <details class="card-raw">
+            <summary>Raw message</summary>
+            <pre>${escHtml(raw)}</pre>
+          </details>
+        </div>
+        <div class="card-footer">
+          <button class="btn-dismiss" onclick="dismiss('${id}')">Dismiss</button>
+        </div>
+      </div>`;
+  }
+
+  // ── Data loading ──
+  async function load() {
+    refreshBtn.classList.add('spinning');
+    try {
+      const params = new URLSearchParams({ limit: 100 });
+      if (activeFilter !== 'all') params.set('type', activeFilter);
+      if (searchVal.trim())       params.set('search', searchVal.trim());
+
+      const res  = await fetch(`${API}/api/entries?${params}`);
+      const json = await res.json();
+
+      badge.textContent = json.total;
+
+      grid.innerHTML = json.data.length
+        ? json.data.map(renderCard).join('')
+        : `<div class="empty">
+             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+               <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+             </svg>
+             <p>No entries yet — simulate a message or connect Slack.</p>
+           </div>`;
+    } catch {
+      grid.innerHTML = `<div class="empty"><p>Could not connect to server. Is it running?</p></div>`;
+    } finally {
+      refreshBtn.classList.remove('spinning');
+    }
+  }
+
+  async function dismiss(id) {
+    await fetch(`${API}/api/entries/${id}`, { method: 'DELETE' });
+    document.getElementById(`card-${id}`)?.remove();
+    badge.textContent = document.querySelectorAll('.card').length;
+    if (!document.querySelectorAll('.card').length) load();
+  }
+
+  document.querySelectorAll('.filter-btns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btns button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      load();
+    });
+  });
+
+  let searchTimer;
+  document.getElementById('search').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchVal = e.target.value;
+    searchTimer = setTimeout(load, 350);
+  });
+
+  load();
+  setInterval(load, 10_000);
+</script>
+</body>
+</html>
