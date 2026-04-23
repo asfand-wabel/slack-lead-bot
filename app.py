@@ -15,7 +15,7 @@ from flask import Flask, jsonify, redirect, request, send_from_directory
 from flask_cors import CORS
 
 from parser import parse_message
-from token_store import get as get_token, set_token
+from token_store import set_token
 
 # ── In-memory store ───────────────────────────────────────────────────────────
 _lock   = threading.Lock()
@@ -115,7 +115,7 @@ if slack_connected:
         add_entry(entry)
         print(f"[bot] /lead form submitted — {fields['account']} ({fields['type']})")
 
-        lines = [f"✅ *New {fields['type']} added to CRM*"]
+        lines = [f"✅ *New {fields['type']} created by <@{body['user']['id']}>*"]
         lines.append(f"*Account:* {fields['account']}")
         lines.append(f"*Contact:* {fields['contact']}")
         if fields.get('title'):  lines.append(f"*Title:* {fields['title']}")
@@ -126,21 +126,14 @@ if slack_connected:
         message_text = '\n'.join(lines)
 
         try:
-            user_token = get_token(body['user']['id'])
-            if user_token:
-                WebClient(token=user_token).chat_postMessage(
-                    channel=channel_id, text=message_text
-                )
-            else:
+            # For DMs between two people the bot isn't a member — open a bot DM with the invoker
+            if channel_id and channel_id.startswith('D'):
                 dm = client.conversations_open(users=body['user']['id'])
-                connect_url = f"{os.environ.get('APP_URL', '')}/connect"
-                client.chat_postMessage(
-                    channel=dm['channel']['id'],
-                    text=(
-                        f"Your lead was saved ✅ but the message couldn't be posted as you.\n"
-                        f"Connect your account once so future messages appear from you: {connect_url}"
-                    ),
-                )
+                target = dm['channel']['id']
+            else:
+                target = channel_id
+            client.chat_postMessage(channel=target, text=message_text)
+            print(f"[bot] posted summary to {channel_name}")
         except Exception as err:
             print(f"[bot] failed to post message: {err}")
 
@@ -328,12 +321,16 @@ def api_mock_entry():
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3000))
 
+    print(f'[web]   Admin dashboard → http://localhost:{PORT}')
+    threading.Thread(
+        target=lambda: web.run(port=PORT, use_reloader=False),
+        daemon=True,
+    ).start()
+
     if slack_app:
-        handler = SocketModeHandler(slack_app, os.environ['SLACK_APP_TOKEN'])
-        threading.Thread(target=handler.start, daemon=True).start()
         print('[slack] Socket Mode connected')
+        handler = SocketModeHandler(slack_app, os.environ['SLACK_APP_TOKEN'])
+        handler.start()  # blocks on main thread — keeps Slack responsive
     else:
         print('[slack] No credentials — running in mock-only mode')
-
-    print(f'[web]   Admin dashboard → http://localhost:{PORT}')
-    web.run(port=PORT, use_reloader=False)
+        threading.Event().wait()  # keep process alive
